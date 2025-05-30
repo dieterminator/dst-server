@@ -5,6 +5,10 @@ ARG uid=1000
 ARG gid=1000
 ARG AGENT_WORKDIR=/home/"${user}"/agent
 
+#java runtime
+
+
+
 # agent 
 FROM alpine:"${ALPINE_TAG}" as agent
 ARG user
@@ -13,6 +17,7 @@ ARG uid
 ARG gid
 ARG AGENT_WORKDIR
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
+ENV PATH="${PATH}"
 # add user and group
 RUN addgroup -g "${gid}" "${group}" \
     && adduser -h /home/"${user}" -u "${uid}" -G "${group}" -D "${user}" || echo "user ${user} already exists." \
@@ -25,11 +30,11 @@ WORKDIR /home/"${user}"
 
 # image server
 FROM agent AS inbound-agent
+ARG user
 USER root
 COPY ./script/ /app/bin/
-RUN chmod +x /app/bin/startServer.sh /app/bin/start.sh &&\
-    touch /app/bin/hold.log
+RUN chmod +x /app/bin/startServer.sh /app/bin/start.sh 
 
 USER ${user}
-
-ENTRYPOINT ["/app/bin/startServer.sh"]
+CMD [ "/app/bin/startServer.sh" ]
+ENTRYPOINT [ "sh" ]

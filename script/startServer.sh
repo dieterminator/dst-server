@@ -1,2 +1,3 @@
 #!/bin/bash
-tail -f /app/bin/hold.log
+echo 1
+tail -f /dev/null
