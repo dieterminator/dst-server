@@ -33,20 +33,14 @@ COPY component/install-tool.sh /usr/bin/local/install-tool.sh
 WORKDIR /app
 RUN chmod 777 /usr/bin/local/install-tool.sh \
 	&& /usr/bin/local/install-tool.sh maven \
-	&& git clone -b develop https://gitee.com/admiralitycode/recl-blog.git
+	&& git clone https://gitee.com/admiralitycode/dstmanage.git
 ENV JAVA_HOME=/opt/jdk-${JAVA_VERSION} MAVEN_HOME=/opt/maven CLASSPATH=/opt/jdk-${JAVA_VERSION}/lib/dt.jar:/opt/jdk-${JAVA_VERSION}/lib/tools.jar
 ENV PATH="${MAVEN_HOME}/bin:${JAVA_HOME}/bin:${PATH}"
 COPY component/maven-settings.xml /app/settings.xml
-WORKDIR /app/recl-blog/serviceserver
-RUN mvn -DskipTests=true clean package -s /app/settings.xml -f /app/recl-blog/serviceserver/pom.xml -P prod \
+WORKDIR /app/dstmanage
+RUN mvn -DskipTests=true clean package -s /app/settings.xml -f /app/dstmanage/pom.xml -P prod \
 	&& mkdir /app/jar
-RUN mv /app/recl-blog/serviceserver/target/*.jar /app/jar/
-
-## COPY ./script/ /app/bin/
-## RUN chmod +x /app/bin/startServer.sh /app/bin/start.sh 
-## 
-## CMD [ "/app/bin/startServer.sh" ]
-## ENTRYPOINT [ "sh" ]
+RUN mv /app/dstmanage/target/*.jar /app/jar/
 
 #java runtime
 FROM alpine:"${ALPINE_TAG}" AS jre
@@ -61,6 +55,9 @@ ARG JAVA_VERSION
 ENV PATH="/opt/jdk-${JAVA_VERSION}/bin:${PATH}"
 RUN chmod 777 /usr/bin/local/install-jre.sh
 RUN /usr/bin/local/install-jre.sh "${JAVA_VERSION}" alpine 
+
+#dst server
+FROM alpine:"${ALPINE_TAG}" AS dst
 
 
 # agent 
