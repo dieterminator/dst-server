@@ -60,35 +60,32 @@ fi
 if [ "${OS}" = "windows" ]; then
     OS_TYPE="windows"
 fi
-if [ "${OS}" = "linux" ]; then
-    OS_TYPE="linux"
-fi
 
 # Loop over the array of architectures
 for ARCH in ${ARCHS}; do
     # Fetch the download URL from the Adoptium API
-    URL="https://mirrors.sustech.edu.cn/Adoptium/${VERSION}/jre/${ARCH}/${OS_TYPE}/"
+    URL="https://mirrors.sustech.edu.cn/Adoptium/${VERSION}/jdk/${ARCH}/${OS_TYPE}/"
 	
-	PACKAGE=$(curl -s ${URL} | sed -n 's/.*>\([^<]*'"jre"'[^<]*\)<.*/\1/p')
+	PACKAGE=$(curl -s ${URL} | sed -n 's/.*>\([^<]*'"OpenJDK"'[^<]*\)<.*/\1/p')
 	
 	URL=${URL}${PACKAGE}
 
-	curl --location --retry 5 --retry-connrefused --output /tmp/jre.tar.gz ${URL}
+	curl --location --retry 5 --retry-connrefused --output /tmp/jdk.tar.gz ${URL}
 done
 
-if ! tar -xzf /tmp/jre.tar.gz -C /opt/; then
-    echo "Error: Failed to extract the jre archive. Exiting with status 1." >&2
+if ! tar -xzf /tmp/jdk.tar.gz -C /opt/; then
+    echo "Error: Failed to extract the JDK archive. Exiting with status 1." >&2
     exit 1
 fi
 
-EXTRACTED_DIR=$(tar -tzf /tmp/jre.tar.gz | head -n 1 | cut -f1 -d"/")
+EXTRACTED_DIR=$(tar -tzf /tmp/jdk.tar.gz | head -n 1 | cut -f1 -d"/")
 
-if ! mv "/opt/${EXTRACTED_DIR}" "/opt/jre-${JAVA_VERSION}"; then
+if ! mv "/opt/${EXTRACTED_DIR}" "/opt/jdk-${JAVA_VERSION}"; then
     echo "Error: Failed to rename the extracted directory. Exiting with status 1." >&2
     exit 1
 fi
 
-if ! rm -f /tmp/jre.tar.gz; then
+if ! rm -f /tmp/jdk.tar.gz; then
     echo "Error: Failed to remove the downloaded archive. Exiting with status 1." >&2
     exit 1
 fi
