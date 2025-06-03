@@ -1,4 +1,5 @@
 ARG ALPINE_TAG=3.21.3
+ARG UBUNTU_TAG=24.04
 ARG user=dst
 ARG group=dst
 ARG uid=1000
@@ -6,62 +7,94 @@ ARG gid=1000
 ARG AGENT_WORKDIR=/home/"${user}"/agent
 ARG JAVA_VERSION=17
 
+# build base image
+FROM ubuntu:${UBUNTU_TAG}
+ARG user
+ARG group
+ARG uid
+ARG gid
+ARG AGENT_WORKDIR
+ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
+ENV PATH="${PATH}"
+SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+# add user and group
+USER root
+RUN if id ${uid} &>/dev/null; then \
+        d_user=$(getent passwd ${uid} | cut -d: -f1); \
+        userdel -r $d_user; \
+        groupdel $d_user 2>/dev/null || true; \
+    fi
+RUN groupadd --gid ${gid} ${group}
+RUN useradd --uid ${uid} --gid ${gid} --create-home --shell /bin/bash -d ${AGENT_WORKDIR} ${user} && chown ${uid}:${gid} -R ${AGENT_WORKDIR}
+RUN sed -e "s|http://security.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g" \
+    -e "s|http://archive.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g" \
+    -i.bak \
+    /etc/apt/sources.list.d/ubuntu.sources \
+    && apt update \
+    && apt install -y ca-certificates \
+    && sed -i 's/http:/https:/g' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt update
+
+
+
 #manage cli
-FROM alpine:"${ALPINE_TAG}" AS manage
-SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
-RUN sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.tuna.tsinghua.edu.cn/alpine#g' /etc/apk/repositories \
-	&& apk update \
-	&& apk add --no-cache \
-	curl \
-	bash \
-	git \
-	git-lfs \
-	musl-locales \
-	openssh-client \
-	openssl \
-	procps \
-	tzdata \
-	tzdata-utils \
-	libstdc++ \
-	&& rm -rf /tmp/*.apk /tmp/gcc /tmp/gcc-libs.tar* /tmp/libz /tmp/libz.tar.xz /var/cache/apk/*
-COPY component/install-jdk.sh /usr/bin/local/install-jdk.sh
-RUN chmod 777 /usr/bin/local/install-jdk.sh
-ARG JAVA_VERSION
-RUN /usr/bin/local/install-jdk.sh "${JAVA_VERSION}" alpine 
-ADD "https://mirrors.sustech.edu.cn/apache/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz" "/tmp/file.tar.gz"
-COPY component/install-tool.sh /usr/bin/local/install-tool.sh
-WORKDIR /app
-RUN chmod 777 /usr/bin/local/install-tool.sh \
-	&& /usr/bin/local/install-tool.sh maven \
-	&& git clone https://gitee.com/admiralitycode/dstmanage.git
-ENV JAVA_HOME=/opt/jdk-${JAVA_VERSION} MAVEN_HOME=/opt/maven CLASSPATH=/opt/jdk-${JAVA_VERSION}/lib/dt.jar:/opt/jdk-${JAVA_VERSION}/lib/tools.jar
-ENV PATH="${MAVEN_HOME}/bin:${JAVA_HOME}/bin:${PATH}"
-COPY component/maven-settings.xml /app/settings.xml
-WORKDIR /app/dstmanage
-RUN mvn -DskipTests=true clean package -s /app/settings.xml -f /app/dstmanage/pom.xml -P prod \
-	&& mkdir /app/jar
-RUN mv /app/dstmanage/target/*.jar /app/jar/
+# FROM alpine:"${ALPINE_TAG}" AS manage
+# SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+# RUN sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.tuna.tsinghua.edu.cn/alpine#g' /etc/apk/repositories \
+# 	&& apk update \
+# 	&& apk add --no-cache \
+# 	curl \
+# 	bash \
+# 	git \
+# 	git-lfs \
+# 	musl-locales \
+# 	openssh-client \
+# 	openssl \
+# 	procps \
+# 	tzdata \
+# 	tzdata-utils \
+# 	libstdc++ \
+# 	&& rm -rf /tmp/*.apk /tmp/gcc /tmp/gcc-libs.tar* /tmp/libz /tmp/libz.tar.xz /var/cache/apk/*
+# COPY component/install-jdk.sh /usr/bin/local/install-jdk.sh
+# RUN chmod 777 /usr/bin/local/install-jdk.sh
+# ARG JAVA_VERSION
+# RUN /usr/bin/local/install-jdk.sh "${JAVA_VERSION}" alpine 
+# ADD "https://mirrors.sustech.edu.cn/apache/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz" "/tmp/file.tar.gz"
+# COPY component/install-tool.sh /usr/bin/local/install-tool.sh
+# WORKDIR /app
+# RUN chmod 777 /usr/bin/local/install-tool.sh \
+# 	&& /usr/bin/local/install-tool.sh maven \
+# 	&& git clone https://gitee.com/admiralitycode/dstmanage.git
+# ENV JAVA_HOME=/opt/jdk-${JAVA_VERSION} MAVEN_HOME=/opt/maven CLASSPATH=/opt/jdk-${JAVA_VERSION}/lib/dt.jar:/opt/jdk-${JAVA_VERSION}/lib/tools.jar
+# ENV PATH="${MAVEN_HOME}/bin:${JAVA_HOME}/bin:${PATH}"
+# COPY component/maven-settings.xml /app/settings.xml
+# WORKDIR /app/dstmanage
+# RUN mvn -DskipTests=true clean package -s /app/settings.xml -f /app/dstmanage/pom.xml -P prod \
+# 	&& mkdir /app/jar
+# RUN mv /app/dstmanage/target/*.jar /app/jar/
 
 #java runtime
-FROM alpine:"${ALPINE_TAG}" AS jre
-SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
-RUN sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.tuna.tsinghua.edu.cn/alpine#g' /etc/apk/repositories \
-	&& apk update \
-	&& apk add --no-cache \
-	curl \
-	ca-certificates
-COPY component/install-jre.sh /usr/bin/local/install-jre.sh
-ARG JAVA_VERSION
-ENV PATH="/opt/jdk-${JAVA_VERSION}/bin:${PATH}"
-RUN chmod 777 /usr/bin/local/install-jre.sh
-RUN /usr/bin/local/install-jre.sh "${JAVA_VERSION}" alpine 
+# FROM base AS jre
+# SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+# RUN sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.tuna.tsinghua.edu.cn/alpine#g' /etc/apk/repositories \
+# 	&& apk update \
+# 	&& apk add --no-cache \
+# 	curl \
+# 	ca-certificates
+# COPY component/install-jre.sh /usr/bin/local/install-jre.sh
+# ARG JAVA_VERSION
+# ENV PATH="/opt/jdk-${JAVA_VERSION}/bin:${PATH}"
+# RUN chmod 777 /usr/bin/local/install-jre.sh
+# RUN /usr/bin/local/install-jre.sh "${JAVA_VERSION}" alpine 
 
 #dst server
-FROM alpine:"${ALPINE_TAG}" AS dst
+FROM base AS dst
+
+
 
 
 # agent 
-FROM alpine:"${ALPINE_TAG}" AS agent
+FROM base AS agent
 ARG user
 ARG group
 ARG uid
@@ -76,10 +109,10 @@ RUN addgroup -g "${gid}" "${group}" \
 	&& apk update
 USER ${uid}:${group}
 RUN mkdir -p /home/${user}/.config && mkdir -p "${AGENT_WORKDIR}"
-COPY --from=jre /opt/jre-17 "/opt/jre17"
+# COPY --from=jre /opt/jre-17 "/opt/jre17"
 ENV USER=${user}
 WORKDIR /home/"${user}"
-COPY --from=manage --chown=${uid}:${group} /app/jar /home/"${user}"/jar 
+# COPY --from=manage --chown=${uid}:${group} /app/jar /home/"${user}"/jar 
 
 # image server
 FROM agent AS inbound-agent
