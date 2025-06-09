@@ -18,7 +18,7 @@ ARG AGENT_WORKDIR
 ARG USER_HOME
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 ENV PATH="${PATH}"
-ENV USER=${user}
+ENV USER=${user} USER_HOME=${USER_HOME}
 SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
 # add user and group
 USER root
@@ -107,7 +107,7 @@ USER ${user}
 WORKDIR "${USER_HOME}"
 RUN mkdir ~/steamcmd && cd ~/steamcmd \
     && curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - \
-    #    && bash ./steamcmd.sh +force_install_dir "${USER_HOME}/dstserver" +login anonymous +app_update 343050 validate +quit
+    # && bash ./steamcmd.sh +force_install_dir "${USER_HOME}/dstserver" +login anonymous +app_update 343050 validate +quit \
     && echo 1
 
 
@@ -122,11 +122,11 @@ ARG USER_HOME
 RUN apt-get install -y --no-install-recommends --no-install-suggests libgcc1 lib32gcc-s1 lib32stdc++6 libcurl4-gnutls-dev
 USER ${uid}:${group}
 WORKDIR ${USER_HOME}
-RUN mkdir -p ${USER_HOME}/.config
+RUN mkdir -p ${USER_HOME}/.config && mkdir -p ${USER_HOME}/dstsaves
 # COPY --from=jre /opt/jre-17 "/opt/jre17"
 # COPY --from=manage --chown=${uid}:${group} /app/jar /home/"${user}"/jar 
 COPY --from=dst --chown=${uid}:${group} ${USER_HOME}/steamcmd ${USER_HOME}/steamcmd
-#COPY --from=dst --chown=${uid}:${group} ${USER_HOME}/dstserver ${USER_HOME}/server 
+# COPY --from=dst --chown=${uid}:${group} ${USER_HOME}/dstserver ${USER_HOME}/server 
 
 # image server
 FROM agent AS inbound-agent
@@ -136,7 +136,7 @@ ARG user
 USER root
 COPY ./script/ /app/bin/
 RUN chmod +x /app/bin/startServer.sh /app/bin/start.sh 
-EXPOSE 8080 
+EXPOSE 8080-8090/tcp 
 USER ${user}
 #CMD [ "/app/bin/startServer.sh" ]
-ENTRYPOINT [ "sh" ]
+ENTRYPOINT [ "/bin/bash" ]
